@@ -1,0 +1,349 @@
+---
+title: "pp"
+output: html_document
+---
+#-----------------------------------------------------------------------------
+# Le package pvaluefunctions
+#-----------------------------------------------------------------------------
+
+Le package pvaluefunctions permet de créer des graphiques des fonctions de la p-value , des distributions de confiance, des densités de confiance ou de la valeur Surprisale (valeur S) (Groenland 2019).
+Installation
+Vous pouvez installer le package directement en  tapant install.packages("pvaluefunctions"). Après l'installation, chargez-le dans R en utilisant library(pvaluefunctions).
+La fonction dépend des packages R suivants, qui doivent être installés au préalable:
+•	ggplot2
+•	Balance
+•	zipfR
+Utilisez la commande install.packages(c("ggplot2", "scales", "zipfR"))dans R pour installer ces packages.
+les données que nous allons utiliser sont issues de la table célèbre, collectées par Edgar Anderson.
+le fichier donne les mesures en centimètre des variables suivantes:
+	longueur du sépale (Sepal.Length)
+	largeur du sépale (Sepal.Widt)
+	longueur du pétale (Petal.Length)
+	largeur du pétale (Petal.Width)
+pour trois espèces d’iris qui sont les : Iris setosa, Iris versicolor et Iris virginica.
+
+
+
+
+Data iris
+pour importer cette table de données, il suffit d'importer la librairie "datasets" et puis exécuter l'instruction "data(iris)".
+T-test 
+Pour tester l'égalité de la moyenne des sepal.length de l'espèce setosa avec celle de l'espèce versicolor, on fait appel au t-test, à deux échantillons avec deux variances inégales, aussi connu par le welch test.
+pour cela, il est indispensable que les données sur lesquelles nous allons appliquer le test respect 3 règles:
+	les échantillons sont normalement distribués, 
+	l'écart type des deux populations est inconnu et suppose qu'il est inégal, 
+	l'échantillon est suffisamment grand (sur 30).
+Notre objectif à travers cette étude, est d’expliquer l'emploi et l’utilité du package pvaluefunctions dans la construction  des graphiques des fonctions p-value, distributions de confiance et les densités de confiance
+
+```{r setup, include=FALSE}
+#-----------------------------------------------------------------------------
+#installation du package "pvaluefunctions"
+#-----------------------------------------------------------------------------
+
+install.packages("pvaluefunctions")
+
+#-----------------------------------------------------------------------------
+#importation du package "pvaluefunctions".
+#----------------------------------------------------------------------------
+
+library(pvaluefunctions)
+
+#-----------------------------------------------------------------------------
+#importation de la librarie "datasets"
+#Base de données iris
+#----------------------------------------------------------------------------
+
+library(datasets)
+data(iris)
+View(iris)
+#On supprime l'espèce de type "virginica" de notre table.
+iris <- iris[iris$Species != "virginica",]
+iris$Species<- factor(iris$Species)
+
+#calcul de la difference entre la moyenne de longueur du sépale type setosa et versicolor.
+with(iris, mean(Petal.Length[ Species== "setosa"])) - with(iris, mean(Petal.Length[Species ==	"versicolor" ]))
+
+
+
+#-----------------------------------------------------------------------------
+# Application du test welch
+#-----------------------------------------------------------------------------
+
+# Hypothese nulle H0: mu(setosa) = (versicolor) vs hypothese alternative H1 mu(setosa) != mu(versicolor)
+Test_welch<-t.test(Petal.Length ~ Species, data = iris, paired=TRUE,var.equal = FALSE)
+Test_welch
+
+#-----------------------------------------------------------------------------
+# Résultat Test du welch
+#-----------------------------------------------------------------------------
+#> 
+#> data:  Petal.Length by Species
+#> t = -37.241, df = 49, p-value < 2.2e-16
+#> alternative hypothesis: true difference in means is not equal to 0
+#> 95 percent confidence interval:
+#>  -2.948983 -2.647017
+#> sample estimates:
+#> mean of the differences 
+#>               -2.798 
+
+```
+#-----------------------------------------------------------------------------
+# Interprétation des Résultats du Test du welch
+#-----------------------------------------------------------------------------
+Comme nous pouvons l'observer d'après les résultats ci-dessus, la p-value qui est de 2.2e-16 est nettement inférieure à notre seuil de 5%. Par conséquence, nous pouvons rejeter l'hypothèse nulle et accepter l'alternative, en d’autres termes la longueur du sépale à un certain effet sur les espèces.
+
+#-----------------------------------------------------------------------------
+# Graphe
+#-----------------------------------------------------------------------------
+
+Maintenant, nous allons illustrer la pvalue par le graphe suivant ,en tenant compte de trois paramètres qui sont:
+1.	estiamte qui indique de notre cas, la différence entre les deux moyennes estimées
+2.	df qui indique le degré de liberté
+3.	tstat est la statistique de décision du test de welch
+
+
+```{r setup, include=FALSE}
+#-----------------------------------------------------------------------------
+# Le graphe (conf_dist)
+#-----------------------------------------------------------------------------
+res <- conf_dist(
+  estimate = c(-2.798)
+  , df = c(49)
+  , tstat = c(-37.241)
+  , type = "ttest"
+  , plot_type = "p_val"
+  , n_values = 1e4L
+  # , est_names = c("")
+  , conf_level = c(0.95, 0.90, 0.80)
+  , null_values = c(0)
+  , trans = "identity"
+  , alternative = "two_sided"
+  , log_yaxis = FALSE
+  , cut_logyaxis = 0.05
+  , xlab = "DIFFERENCE ENTRE mu(setosa) ET mu(versicolor)"
+  , together = FALSE
+  , plot_p_limit = 1 - 0.999
+  , plot_counternull = TRUE
+  , x_scale = "line"
+  , plot = TRUE)
+```
+#-----------------------------------------------------------------------------
+# test du chi-carré
+#-----------------------------------------------------------------------------
+Vérifiant maintenant ,s'il y a une interaction entre Species et Petal.Width.Cat. 
+Tout d'abord, nous allons convertir la variable continu "Petal.Width" en une variable catégorielle qui se nommera "Petal.Width.Cat",
+une fois ces deux  variables sont catégorielles, nous utiliserons le test du chi-carré et ensuite nous élaborons un tableau de contingence qui va nous servir en moment du test.
+
+NB : pour faire le test de chi-carré les variables doivent êtres qualitatives…
+
+pour effectuer le test, nous supposerons les hyopthses suivantes:
+
+	H0: Le Petal.Width.Cat n'a aucun effet sur l'espèce.               vs 
+	H1: Le Petal.Width.Cat a un certain effet sur les espèces
+
+
+```{r pressure, echo=FALSE}
+# la function summary permet d'avoir la description statistique de la variable Petal.Width(largeur du pétale)
+summary(iris$Petal.Width)
+#convertion de la variable continue Petal.Width en variable catégorielle 
+iris$Petal.Width.Cat <- cut(iris$Petal.Width, breaks = quantile(iris$Petal.Width, probs = seq(0, 1, 0.5)), include.lowest = TRUE)
+levels(iris$Petal.Width.Cat) <- c("Dessous", "Dessus")
+# "dessous" est affecté aux valeurs qui sont au dessous de la mediane et "dessus" l'inverse.
+quantile(iris$Petal.Width, probs = seq(0, 1, 0.5))
+
+#-----------------------------------------------------------------------------
+#création d'un tableau de contingence
+#-----------------------------------------------------------------------------
+
+table_contingence <- table(iris$Petal.Width.Cat, iris$Species)
+#application du test de KHI-DEUX.
+Xsqt <- chisq.test(table_contingence)
+Xsqt
+```
+#-----------------------------------------------------------------------------
+# Interprétation des Résultats du Test du chi-carré
+#-----------------------------------------------------------------------------
+
+D’après les résultats, la p-value est inferieur à 2.2e-16 , ce qui est bien plus petit que la valeur du seuil de 5%. Cela nous permet de rejeter en l'hypothèse nulle et d'accepter l'hypothèse alternative. En d'autres termes, Petal.Width.Cat à un impact sur les espèces, ce qui nous permet de conclure que Petal.Width.Cat est un bon prédicteur pour les espèces.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# La regression 
+#-----------------------------------------------------------------------------
+
+Dans l'exemple qui suit nous tentons un premier modèle de régression multiple qui nous permettra de voir la relation entre le Sepal.Length comme variable à expliquer (output) et les prédicteurs suivants (variables explicatives):
+	Sepal.Width
+	Petal.Length
+	Petal.Width
+Pour cela nous allons utiliser la fonction lm et fonction summary pour afficher les résultats de notre modèle.
+
+```{r}
+modele_regression <- lm(Sepal.Length~Sepal.Width + Petal.Length+Petal.Width, data = iris)
+summary(modele_regression )
+
+#-----------------------------------------------------------------------------
+# Resultats de la regression 
+#-----------------------------------------------------------------------------
+
+#> Call:
+#> lm(formula = Sepal.Length ~ Sepal.Width + Petal.Length + Petal.Width, data = iris)
+
+#>  Residuals:
+#>     Min       1Q   Median       3Q      Max 
+#>  -0.76316 -0.23722  0.00556  0.18770  0.59723 
+
+#>  Coefficients:
+#>             Estimate Std. Error t value Pr(>|t|)    
+#>  (Intercept)   2.07067    0.31620   6.549 2.86e-09 ***
+#>  Sepal.Width   0.61196    0.07879   7.767 8.80e-12 ***
+#>  Petal.Length  0.63897    0.10560   6.051 2.77e-08 ***
+#>  Petal.Width  -0.41249    0.26325  -1.567     0.12    
+---
+#>  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#>  Residual standard error: 0.2973 on 96 degrees of freedom
+#>  Multiple R-squared:  0.7918,	Adjusted R-squared:  0.7853 
+#>  F-statistic: 121.7 on 3 and 96 DF,  p-value: < 2.2e-16
+```
+#-----------------------------------------------------------------------------
+# Interprétation des Résultats de la regression
+#-----------------------------------------------------------------------------
+
+D’après la sortie, on constate que notre modèle à un pouvoir explicative de 78,53% (R ajusté = 78,53%),donc nous pouvons dire que notre modèle à priori est adapté pour prédire la variable Sepal.Length, en d’autres termes, la relation linéaire positive entres les variables (variable explicatives et variables à expliquer sepal.length ) est assez forte (proche de 1).
+
+Avant d’interpréter les résultats, il convient d’évaluer la significativité globale du modèle.
+
+#Hypothèse du test de significativité globale du modèle
+
+H0 : Absence de significativité globale des variables, H1: Au moins une variable n’est pas significativement différente
+de zéro.
+
+Ici, comme la p-value associée au modèle( p-value=2.2e-16) est inférieure à 5%, on rejette H0, et on peut conclure que le modèle est globalement significatif.
+
+Si cela n’avait pas été le cas, il convient d’exclure à chaque fois les variables statistiquement non significatives (p-value associée à la variable>5%) , et refaire à chaque fois le test, jusqu'à ce que le modèle soit globalement significatif.
+
+les graphes ci-dessous nous montrent ces derniers résulatats 
+
+
+#-----------------------------------------------------------------------------
+# Graphe
+#-----------------------------------------------------------------------------
+```{r}
+#-----------------------------------------------------------------------------
+# Le graphe (conf_dist) pvalue de Sepal.Width 
+#-----------------------------------------------------------------------------
+
+res1 <- conf_dist(
+  estimate = c(0.61196)
+  , df = c(96 )
+  , stderr = (0.31620)
+  , type = "linreg"
+  , plot_type = "p_val"
+  , n_values = 1e4L
+  , conf_level = c(0.95, 0.90, 0.80)
+  , null_values = c(0)
+  , trans = "identity"
+  , alternative = "two_sided"
+  , log_yaxis = TRUE
+  , cut_logyaxis = 0.05
+  , xlab = "Coefficient Petal.Width "
+  , together = FALSE
+  , plot_p_limit = 1 - 0.999
+  , plot_counternull = FALSE
+  , plot = TRUE)
+```
+Ici nous allons faire la même démarche mais cette fois-ci pour les coefficients associés aux deux variables  Petal.Length  et Petal.Width.
+D'apres de le graphe ci-dessous, on constate que pour un seuil de significativité de 5% le coefficient associe  Petal.Width est diffèrent de zero , par contre, le coefficient associé à la variable Petal.Length n'est pas diffèrent de zéro car sa p-value et supérieur de 5% de plus il a un intervalle de confiance qui contient le zero.
+
+```{r}
+res2 <- conf_dist(
+  estimate = c(0.63897, -0.41249 )
+  , df = c(96 , 96 )
+  , stderr = c( 0.10560,  0.26325)
+  , type = "linreg"
+  , plot_type = "p_val"
+  , n_values = 1e4L
+  , est_names = c("Petal.Length", "Petal.Width")
+  , conf_level = c(0.95, 0.90, 0.80)
+  , null_values = c(0)
+  , trans = "identity"
+  , alternative = "two_sided"
+  , log_yaxis = FALSE
+  , cut_logyaxis = 0.05
+  , xlab = "Regression coefficients"
+  , together = TRUE
+  , same_color = FALSE
+  , plot_p_limit = 1 - 0.999
+  , plot_counternull = FALSE
+  , inverted = FALSE)
+
+```
+#-----------------------------------------------------------------------------
+# coefficient de corrélation de PEARSON
+#-----------------------------------------------------------------------------
+
+Dans l'exemple ci-dessous  nous allons tester L'existence d'une relation linaire entre Sepal.Width et Petal.Length à travers le coefficient de corrélation de PEARSON.
+Le coefficient de Pearson est un indice reflétant une relation linéaire entre deux variables continues. cet indice  varie entre- 1et 1 : 
+-	0 indique une relation nulle entre les deux variables, 
+-	une valeur négative (corrélation négative) signifiant que lorsque l’une des variables augmente, l'autre diminue; 
+-	tandis que la valeur positive (corrélation positive) indique que les deux variables varient ensemble dans le même sens. 
+les hypothèses du test de corrélation de de PEARSON sont les suivantes:
+
+H0: Pas de corrélation entre les deux variables : P = 0         VS 
+H1: Corrélation entre les deux variables : P !=0 
+
+```{r}
+cor.test(iris$Sepal.Width, iris$Petal.Length, alternative = "two.sided", method = "pearson")
+
+#-----------------------------------------------------------------------------
+# Resultats du coefficient de corrélation de PEARSON
+#-----------------------------------------------------------------------------
+#> Pearson's product-moment correlation
+
+#> data:  iris$Sepal.Width and iris$Petal.Length
+#> t = -7.4763, df = 98, p-value = 3.265e-11
+#> alternative hypothesis: true correlation is not equal to 0
+#> 95 percent confidence interval:
+#> -0.7145027 -0.4607906
+#> sample estimates:
+#> cor 
+#> -0.6026631 
+
+```
+#-----------------------------------------------------------------------------
+# Interprétation des Résultats du coefficient de corrélation de PEARSON
+#-----------------------------------------------------------------------------```
+
+la corrélation observée dans cet échantillon entre le Petal.Length et le Sepal.Width  est de -0.6026.
+
+La probabilité d'avoir une corrélation aussi élevée dans cet échantillon est de 3.265e-11. 
+
+Etant donné que cette probabilité est faible (inférieure au seuil de significativité = 0.05), on peut rejeter H0 et conclure que la corrélation entre le Petal.Length et le Sepal.Width est significativement négative.
+
+
+#-----------------------------------------------------------------------------
+# Graphe
+#-----------------------------------------------------------------------------
+```{r}
+res3 <- conf_dist(
+  estimate = c(-0.6026631)
+  , n = 100
+  , type = "pearson"
+  , plot_type = "p_val"
+  , n_values = 1e4L
+  , conf_level = c(0.95, 0.90, 0.80)
+  , null_values = c(0)
+  , trans = "identity"
+  , alternative = "one_sided"
+  , log_yaxis = FALSE
+  , cut_logyaxis = 0.05
+  , xlab = "Pearson correlation"
+  , together = TRUE
+  , plot_p_limit = 1 - 0.999
+  , plot_counternull = FALSE)
+```
+le graphique ci-dessus, nous montre que pour un seuil de significativité de 5% le coefficient de Pearson de la population possède un intervalle de confiance qui ne contient pas le zéro.
+D'où le rejet de l'hypothèses nulle.
+
+
